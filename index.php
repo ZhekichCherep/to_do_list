@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once './includes/dbConnect.inc.php';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -15,11 +16,12 @@ session_start();
     </div>
 
     <template id="login-template">
-        <a> Sign In </a>
+        <h> Sign In </h>
         <form id="sign_in_form">
             <input id="login" placeholder="login/e-mail" name='login'>
             <input id="password" placeholder="password" type="text" name="password">
             <div id="error_message"></div>
+            <div id="success_message"></div>
             <button type="submit" id="sign_in">Sign in</button>
             <div class="bottom_label">
                 <a href="#register" id="ref_to_sign_up">Registration</a>
@@ -42,6 +44,7 @@ session_start();
             <input id="password"  placeholder="password" name="password">
             <input id="password_confirmation" placeholder="password confirmation" name="password_confirmation">
             <div id="error_message"></div>
+            <div id="success_message"></div>
             <button type="submit">Sign up</button>
         </form>
     </template>
@@ -64,9 +67,47 @@ session_start();
                 <input placeholder="Email or login" id="email">
                 <button type="submit">Reset password</button>
             </form>
-        <div id="error_message"></div>
+            <div id="error_message"></div>
+            <div id="success_message"></div>
 
         <?} ?>
+    </div>
+    </template>
+
+<template id="tasks-template">
+    <div class="container">
+        <header>
+            <h1>My ToDo List</h1>
+            <div class="user-info">
+                <span id="user-name"></span>
+                <a href="#logout" class="logout-btn">Logout</a>
+            </div>
+        </header>
+
+        <div class="todo-container">
+            <form id="add-task-form" class="add-task-form">
+                <input type="text" name="task_title" placeholder="Enter task title" required>
+                <textarea name="task_description" placeholder="Enter task description"></textarea>
+                <input type="date" name="due_date">
+                <select name="priority">
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                </select>
+                <button type="submit">Add Task</button>
+            </form>
+
+            <div class="task-filters">
+                <select id="task-filter">
+                    <option value="all">All Tasks</option>
+                    <option value="active">Active</option>
+                    <option value="completed">Completed</option>
+                </select>
+            </div>
+
+            <div class="tasks-list">
+            </div>
+        </div>
     </div>
     </template>
 

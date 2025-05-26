@@ -35,7 +35,7 @@ if(isset($_POST['login'])) {
             ]);
         }
 
-        if (sendMail($email, "http://localhost/ToDoListPHP/pages/ResetPassword.php?token=".$token)) {
+        if (sendMail($email, "http://localhost/to_do_list/to_do_list/index.php?token=".$token."#reset-password")) {
             echo json_encode([
                 'success' => true,
                 'error' => "Письмо с инструкциями отправлено на вашу почту"
