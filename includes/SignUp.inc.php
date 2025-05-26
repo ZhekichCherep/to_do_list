@@ -49,7 +49,7 @@ if(isset($_POST)){
             echo "Ошибка: " . $e->getMessage();
         }
 
-        if(sendMail($email, "Перейдите для активации аккаунта http://localhost/ToDoListPHP/index.php?token=".$token)){
+        if(sendMail($email, "Перейдите для активации аккаунта http://localhost/to_do_list/to_do_list/index.php?activate_token=".$token)){
                 echo json_encode([
                     'success' => true,
                     'message' => 'Для завершения активации перейдите по ссылке в письме'

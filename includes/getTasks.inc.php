@@ -11,8 +11,7 @@ try {
     }
 
     $user_id = $_SESSION['user_id'];
-    $filter = isset($_GET['filter']) ? $_GET['filter'] : 'all';
-    
+    $filter = isset($_POST['filter']) ? $_POST['filter'] : 'all';    
     $sql = "SELECT * FROM tasks WHERE user_id = :user_id";
     
     if ($filter === 'active') {
@@ -21,7 +20,7 @@ try {
         $sql .= " AND completed = 1";
     }
     
-    $sql .= " ORDER BY completed ASC, priority DESC";
+    $sql .= " ORDER BY priority ASC";
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute(['user_id' => $user_id]);

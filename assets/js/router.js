@@ -9,7 +9,8 @@ class Router{
             'register': this.showRegister.bind(this),
             'reset-password': this.showResetPassword.bind(this),
             'tasks': this.showTasks.bind(this),
-            'logout': this.logout.bind(this)
+            'logout': this.logout.bind(this),
+            'edit-task': this.showEditTask.bind(this)
         };
         this.init();
     }
@@ -21,7 +22,8 @@ class Router{
 
     route(){
         let hash = window.location.hash.split('?')[0].substring(1);
-        if(!hash){
+        console.log(hash)
+        if(!hash || window.location.hash.includes('activate_token')){
             hash = 'login';
         }
         const handler = this.routes[hash.split('/')[0]] || this.showNotFound;
@@ -73,6 +75,23 @@ class Router{
 
     showNotFound() {
         document.getElementById('view-container').innerHTML = '<h1>404 Страница не найдена</h1>';
+    }
+
+    showEditTask() {
+        if(!checkAuth()){
+            window.location.hash = 'login';
+            return;
+        }
+        
+        const taskId = new URLSearchParams(window.location.hash.split('?')[1]).get('id');
+        
+        if(!taskId) {
+            this.showNotFound();
+            return;
+        }
+
+        document.getElementById('view-container').innerHTML = document.getElementById('edit-task-template').innerHTML;
+        this.setupEditTaskForm(taskId);
     }
 
     setupLoginForm() {
@@ -176,48 +195,60 @@ class Router{
 
     setupResetPasswordFrom() {
         const errorElement = document.getElementById("error_message");
-        const successElenent = document.getElementById("success_message");
-        if (getFromLocalStorage("message")){
-            setErrorMessage(successElenent, getFromLocalStorage("message"), true);
+        const successElement = document.getElementById("success_message");
+        
+        if (getFromLocalStorage("message")) {
+            setErrorMessage(successElement, getFromLocalStorage("message"), true);
             saveToLocalStorage("message", '');
         }
 
-        if (window.location.hash.includes('token=')) {
-            const token = new URLSearchParams(window.location.hash.split('?')[1]).get('token');
+        const urlParams = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.slice(1).split('?')[1] || '');
+        const token = urlParams.get('token') || hashParams.get('token');
 
+        if (token) {
             const changePasswordForm = document.getElementById("change_password");
             if (changePasswordForm) {
                 changePasswordForm.addEventListener("submit", async (e) => {
                     e.preventDefault();
 
-                    const password = document.querySelector('input[name="password"]').value;
-                    const passwordConfirmation = document.querySelector('input[name="password_confirmation"]').value;
+                    const new_password = changePasswordForm.querySelector('input[name="password"]').value;
+                    const passwordConfirmation = changePasswordForm.querySelector('input[name="password_confirmation"]').value;
 
-                    if (password !== passwordConfirmation) {
+                    if (new_password !== passwordConfirmation) {
                         setErrorMessage(errorElement, "Пароли не совпадают", true);
                         return;
                     }
 
-                    const response = await sendPostRequest("./includes/ResetPassword.inc.php", {
-                        token: token,
-                        new_password: password
-                    });
+                    try {
+                        const response = await sendPostRequest("./includes/ChangePassword.inc.php", {
+                            token: token,
+                            password: new_password
+                        });
 
-                    if (response.success) {
-                        saveToLocalStorage("message", "Пароль успешно изменён");
-                        window.location.hash = "#login";
-                    } else {
-                        setErrorMessage(errorElement, response.error, true);
+                        if (response?.success) {
+                            saveToLocalStorage("message", "Пароль успешно изменён");
+                            const url = new URL(window.location.href);
+                            url.searchParams.delete('token');
+                            url.hash = "#login";
+                            window.location.href = url.toString();
+                             
+                        } else {
+                            setErrorMessage(errorElement, response?.error || "Ошибка сервера", true);
+                        }
+                    } catch (error) {
+                        console.error('Password reset error:', error);
+                        setErrorMessage(errorElement, "Ошибка соединения", true);
                     }
                 });
             }
-        }
+        } 
         else {
             const resetPasswordForm = document.getElementById("reset_password_form");
             if (resetPasswordForm) {
                 resetPasswordForm.addEventListener("submit", async (e) => {
                     e.preventDefault();
-                    const emailValue = document.getElementById("email").value;
+                    const emailValue = resetPasswordForm.querySelector("#email").value;
 
                     if (checkIsEmptyValue(emailValue)) {
                         setErrorMessage(errorElement, "Все поля обязательные", true);
@@ -230,15 +261,21 @@ class Router{
                     }
 
                     setErrorMessage(errorElement, "", false);
-                    const response = await sendPostRequest("./includes/ResetPassword.inc.php", {
-                        login: emailValue
-                    });
+                    
+                    try {
+                        const response = await sendPostRequest("./includes/ResetPassword.inc.php", {
+                            login: emailValue
+                        });
 
-                    if (response.success) {
-                        saveToLocalStorage("message", "Письмо с инструкциями отправлено на вашу почту");
-                        window.location.hash = "#login";
-                    } else {
-                        setErrorMessage(errorElement, response.error, true);
+                        if (response?.success) {
+                            saveToLocalStorage("message", "Письмо с инструкциями отправлено на вашу почту");
+                            window.location.href = "#login";
+                        } else {
+                            setErrorMessage(errorElement, response?.error || "Ошибка сервера", true);
+                        }
+                    } catch (error) {
+                        console.error('Password reset request error:', error);
+                        setErrorMessage(errorElement, "Ошибка соединения", true);
                     }
                 });
             }
@@ -247,7 +284,9 @@ class Router{
 
     setupTasksForm() {
         const tasksContainer = document.querySelector('.tasks-list');
-        sendPostRequest("./includes/getTasks.inc.php").then(tasks => {
+        const filter_value = document.getElementById('task-filter').value;
+        console.log(filter_value);
+        sendPostRequest("./includes/getTasks.inc.php", {filter: filter_value}).then(tasks => {
             tasksContainer.innerHTML = '';
             
             if (tasks.length === 0) {
@@ -288,8 +327,7 @@ class Router{
                 </div>
             </div>
             <div class="task-actions">
-                <a href="#edit-task?id=${task.id}" class="edit-btn">Edit</a>
-                <form class="delete-task-form">
+                    <a href="#edit-task?id=${task.id}" class="edit-btn">Edit</a>                <form class="delete-task-form">
                     <input type="hidden" name="task_id" value="${task.id}">
                     <button type="submit" class="delete-btn">Delete</button>
                 </form>
@@ -300,20 +338,38 @@ class Router{
     }
 
     setupTaskEventHandlers() {
-        
-        document.querySelectorAll('.add-task-form').forEach(form => {
-            form.addEventListener('submit', async (e) => {
-                const formData = new FormData(form);
-                const formDataObj = Object.fromEntries(formData.entries());
-                console.log(formDataObj);
-                try {
-                    const response = await sendPostRequest('./includes/toggleTask.inc.php', formDataObj);
-                    if (!response.success) throw new Error('Toggle failed');
-                    this.setupTasksForm(); 
-                } catch (error) {
-                    console.error('Error toggling task:', error);
+        document.getElementById('task-filter').addEventListener('change', async (e) =>{
+            console.log('nvaoi')
+            this.setupTasksForm();
+        });
+        document.getElementById('add-task-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const form = document.getElementById('add-task-form');
+            const formData = new FormData(form);
+            const formDataObj = Object.fromEntries(formData.entries());
+            
+            console.log('Form data:', formDataObj);
+            
+            if (!formDataObj.task_title?.trim()) {
+                alert('Task title is required!');
+                return;
+            }
+
+            try {
+                const response = await sendPostRequest('./includes/addTask.inc.php', formDataObj);
+                console.log('Server response:', response);
+                
+                if (!response.success) {
+                    throw new Error(response.message || 'Add task failed');
                 }
-            });
+                
+                this.setupTasksForm(); 
+                form.reset(); 
+            } catch (error) {
+                console.error('Error adding task:', error);
+                alert(`Error: ${error.message}`);
+            }
         });
 
         document.querySelectorAll('.toggle-task-form').forEach(form => {
@@ -347,6 +403,50 @@ class Router{
                 }
             });
         });
+    }
+
+    async setupEditTaskForm(taskId) {
+        try {
+            const response = await sendPostRequest('./includes/getTask.inc.php', { task_id: taskId });
+            
+            if (!response.success) {
+                throw new Error(response.message || 'Failed to load task');
+            }
+            
+            const task = response.task;
+            const form = document.getElementById('edit-task-form');
+            
+            form.elements.task_title.value = task.title;
+            form.elements.task_description.value = task.description || '';
+            form.elements.due_date.value = task.due_date || '';
+            form.elements.priority.value = task.priority || 'medium';
+            
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const formData = new FormData(form);
+                const formDataObj = Object.fromEntries(formData.entries());
+                formDataObj.task_id = taskId;
+                
+                try {
+                    const saveResponse = await sendPostRequest('./includes/updateTask.inc.php', formDataObj);
+                    
+                    if (!saveResponse.success) {
+                        throw new Error(saveResponse.message || 'Failed to update task');
+                    }
+                    
+                    window.location.hash = 'tasks';
+                } catch (error) {
+                    console.error('Error updating task:', error);
+                    alert(`Error: ${error.message}`);
+                }
+            });
+            
+        } catch (error) {
+            console.error('Error loading task:', error);
+            alert(`Error: ${error.message}`);
+            window.location.hash = 'tasks';
+        }
     }
 
     escapeHtml(unsafe) {

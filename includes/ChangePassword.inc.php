@@ -6,7 +6,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit();
 }
 
-if (!isset($_POST['password'], $_POST['password_confirmation'], $_POST['token'])) {
+if (!isset($_POST['password'], $_POST['token'])) {
     echo json_encode(['success' => false, 'error' => 'Missing required fields']);
     exit();
 }
@@ -15,11 +15,10 @@ require_once "dbConnect.inc.php";
 require_once "function.inc.php";
 
 $password = checkValue($_POST['password']);
-$password_confirmation = checkValue($_POST['password_confirmation']);
 $token = checkValue($_POST['token']);
 
 try {
-    $sql = "SELECT user_id FROM tokens WHERE token = :token";
+    $sql = "SELECT id FROM tokens WHERE token = :token";
     $stmt = $pdo->prepare($sql);
     $stmt->execute(['token' => $token]);
     $tokenData = $stmt->fetch();
@@ -29,10 +28,10 @@ try {
         exit();
     }
 
-    $user_id = $tokenData['user_id'];
+    $user_id = $tokenData['id'];
 
     $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-    $sqlUpdatePassword = "UPDATE users SET password = :password WHERE id = :user_id";
+    $sqlUpdatePassword = "UPDATE users_data SET password = :password WHERE id = :user_id";
     $stmtUpdate = $pdo->prepare($sqlUpdatePassword);
     $stmtUpdate->execute([
         'user_id' => $user_id,
@@ -49,9 +48,8 @@ try {
     ]);
 
 } catch (PDOException $e) {
-    error_log('Database error: ' . $e->getMessage());
     echo json_encode([
         'success' => false,
-        'error' => 'Ошибка сервера. Пожалуйста, попробуйте позже'
+        'error' => 'Database error: ' . $e->getMessage()
     ]);
 }

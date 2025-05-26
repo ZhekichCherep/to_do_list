@@ -1,5 +1,7 @@
 <?php
+header('Content-Type: application/json');
 session_start();
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SESSION['user_id'])) {
     require_once 'dbConnect.inc.php';
     
@@ -20,13 +22,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SESSION['user_id'])) {
             'priority' => $priority
         ]);
         
-        header("Location: ../pages/main.php");
+        echo json_encode(['success' => true]);
         exit();
     } catch (PDOException $e) {
-        die("Error adding task: " . $e->getMessage());
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
-} else {
-    header("Location: ../pages/SignIn.php");
+} 
+else {
+        echo json_encode(['success' => false]);
     exit();
 }
 ?>

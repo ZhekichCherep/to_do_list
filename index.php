@@ -61,6 +61,8 @@ require_once './includes/dbConnect.inc.php';
                 <input placeholder="New password" name="password">
                 <input  placeholder="Confirm new password" name="password_confirmation">
                 <button type="submit">Change password</button>
+                <div id="error_message"></div>
+                <div id="success_message"></div>
             </form>
         <?} else { ?>
             <form id="reset_password_form">
@@ -75,6 +77,26 @@ require_once './includes/dbConnect.inc.php';
     </template>
 
 <template id="tasks-template">
+
+<template id="edit-task-template">
+    <div class="edit-task-container">
+        <h2>Edit Task</h2>
+        <form id="edit-task-form" class="task-form">
+            <input type="text" name="task_title" placeholder="Task title" required>
+            <textarea name="task_description" placeholder="Task description"></textarea>
+            <input type="date" name="due_date">
+            <select name="priority">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+            </select>
+            <button type="submit">Save Changes</button>
+            <a href="#tasks" class="cancel-btn">Cancel</a>
+        </form>
+    </div>
+</template>
+
+
     <div class="container">
         <header>
             <h1>My ToDo List</h1>
@@ -94,7 +116,7 @@ require_once './includes/dbConnect.inc.php';
                     <option value="medium" selected>Medium</option>
                     <option value="high">High</option>
                 </select>
-                <button type="submit">Add Task</button>
+                <button id="add-task-button" type="submit">Add Task</button>
             </form>
 
             <div class="task-filters">
@@ -110,7 +132,34 @@ require_once './includes/dbConnect.inc.php';
         </div>
     </div>
     </template>
+        <?php if (isset($_GET['activate_token'])) { 
+        ?>        <h>Успешно активиравано</h>
+        <?
+        require_once "includes/dbConnect.inc.php";
+        try{
+            $token = $_GET['activate_token'];
+            $sql = "SELECT id FROM tokens WHERE token=:token;";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute(['token'=>$token]);
+            $id = $stmt->fetch()['id'];
+            $sqlUpdateActive = "UPDATE users_data SET active = 1 WHERE id = :id";
+            $sqlDeleteToken = "DELETE FROM tokens WHERE token = :token";
+            $stmtUpdate = $pdo->prepare($sqlUpdateActive);
+            $stmtDelete = $pdo->prepare($sqlDeleteToken);
+            $stmtUpdate->execute([
+                'id' => $id,
+            ]);
+            $stmtDelete->execute([
+                'token' => $token,
+            ]);
+            exit();
 
+        }
+        catch (PDOException $e) {
+            die("Database error: " . $e->getMessage());
+        }
+
+    } ?>
     <script src="./assets/js/router.js" type="module"></script>
 </body>
 </html>
