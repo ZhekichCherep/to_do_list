@@ -1,4 +1,4 @@
-<?php
+<div?php
 session_start();
 require_once './includes/dbConnect.inc.php';
 ?>
@@ -76,7 +76,6 @@ require_once './includes/dbConnect.inc.php';
     </div>
     </template>
 
-<template id="tasks-template">
 
 <template id="edit-task-template">
     <div class="edit-task-container">
@@ -97,11 +96,13 @@ require_once './includes/dbConnect.inc.php';
 </template>
 
 
+<template id="tasks-template">
+
     <div class="container">
         <header>
             <h1>My ToDo List</h1>
             <div class="user-info">
-                <span id="user-name"></span>
+                <div id="user-name"></div>
                 <a href="#logout" class="logout-btn">Logout</a>
             </div>
         </header>
@@ -131,35 +132,7 @@ require_once './includes/dbConnect.inc.php';
             </div>
         </div>
     </div>
-    </template>
-        <?php if (isset($_GET['activate_token'])) { 
-        ?>        <h>Успешно активиравано</h>
-        <?
-        require_once "includes/dbConnect.inc.php";
-        try{
-            $token = $_GET['activate_token'];
-            $sql = "SELECT id FROM tokens WHERE token=:token;";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute(['token'=>$token]);
-            $id = $stmt->fetch()['id'];
-            $sqlUpdateActive = "UPDATE users_data SET active = 1 WHERE id = :id";
-            $sqlDeleteToken = "DELETE FROM tokens WHERE token = :token";
-            $stmtUpdate = $pdo->prepare($sqlUpdateActive);
-            $stmtDelete = $pdo->prepare($sqlDeleteToken);
-            $stmtUpdate->execute([
-                'id' => $id,
-            ]);
-            $stmtDelete->execute([
-                'token' => $token,
-            ]);
-            exit();
-
-        }
-        catch (PDOException $e) {
-            die("Database error: " . $e->getMessage());
-        }
-
-    } ?>
+</template>
     <script src="./assets/js/router.js" type="module"></script>
 </body>
 </html>

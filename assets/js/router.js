@@ -13,6 +13,8 @@ class Router{
             'edit-task': this.showEditTask.bind(this)
         };
         this.init();
+        this.handleActivationToken();
+        let count = 0;
     }
 
     init() {
@@ -29,35 +31,74 @@ class Router{
         const handler = this.routes[hash.split('/')[0]] || this.showNotFound;
         handler.call(this);
     }
-    showLogin(){
-        // if(checkAuth()){
-        //     window.location.hash = 'tasks';
-        //     return;
-        // }
+
+    async handleActivationToken() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const activationToken = urlParams.get('activate_token');
+        saveToLocalStorage('message', 'Аккаунт успешно активирован!');
+
+        if (activationToken) {
+            try {
+                document.getElementById('view-container').innerHTML = '<p>Активация аккаунта...</p>';
+                
+                const response = await sendPostRequest('./includes/activateAccount.inc.php', {
+                    activate_token: activationToken
+                });
+                
+                if (response.success) {
+                    const newUrl = window.location.pathname;
+                    window.history.replaceState({}, document.title, newUrl);
+                    
+                    saveToLocalStorage('message', 'Аккаунт успешно активирован!');
+                    this.count = 1;
+                    window.location.hash = 'login';
+                } else {
+                    throw new Error(response.error || 'Ошибка активации');
+                    
+                }
+            } catch (error) {
+                
+                console.error('Activation error:', error);
+                document.getElementById('view-container').innerHTML = `
+                    <div class="error-message">
+                        Ошибка активации: ${error.message}
+                        <a href="#login">Перейти к входу</a>
+                    </div>
+                `;
+            }
+        }
+    }
+
+
+    async showLogin(){
+        if(await checkAuth()){
+            window.location.hash = 'tasks';
+            return;
+        }
         document.getElementById('view-container').innerHTML = document.getElementById('login-template').innerHTML;
         this.setupLoginForm();
     }
 
-    showRegister(){
-        // if(checkAuth()){
-        //     window.location.hash = 'tasks';
-        //     return;
-        // }
+    async showRegister(){
+        if(await checkAuth()){
+            window.location.hash = 'tasks';
+            return;
+        }
         document.getElementById('view-container').innerHTML = document.getElementById('register-template').innerHTML;
         this.setupRegisterFrom();
     }
 
-    showResetPassword(){
-        // if(checkAuth()){
-        //     window.location.hash = 'tasks';
-        //     return;
-        // }
+    async showResetPassword(){
+        if(await checkAuth()){
+            window.location.hash = 'tasks';
+            return;
+        }
         document.getElementById('view-container').innerHTML = document.getElementById('reset-password-template').innerHTML;
         this.setupResetPasswordFrom();
     }
 
-    showTasks() {
-        if(!checkAuth()){
+    async showTasks() {
+        if(!await checkAuth()){
             window.location.hash = 'login';
             return;
         }
@@ -100,13 +141,19 @@ class Router{
         const successElenent = document.getElementById("success_message");
         if (getFromLocalStorage("message")){
             setErrorMessage(successElenent, getFromLocalStorage("message"), true);
-            saveToLocalStorage("message", '');
+            if (this.count > 2){
+                saveToLocalStorage("message", '');
+                setErrorMessage(successElenent, '', false)
+            }
+            else{ 
+                this.count += 1
+            }
         }
-
         if (signInForm) {
             signInForm.addEventListener("submit", async (e) => {
                 e.preventDefault();
 
+                this.count += 1
                 const loginValue = document.getElementById("login").value;
                 const passwordValue = document.getElementById("password").value;
 
@@ -220,6 +267,11 @@ class Router{
                         return;
                     }
 
+                    if(!checkPassword(new_password)){
+                        setErrorMessage(errorElement, "Пароль должен содеражать минимум 8 символов, 1 букву и 1 спец. символ", true);
+                        return;
+                    }
+
                     try {
                         const response = await sendPostRequest("./includes/ChangePassword.inc.php", {
                             token: token,
@@ -282,10 +334,14 @@ class Router{
         }
     }
 
-    setupTasksForm() {
+    async setupTasksForm() {
         const tasksContainer = document.querySelector('.tasks-list');
         const filter_value = document.getElementById('task-filter').value;
-        console.log(filter_value);
+        const user_data = await sendPostRequest('./includes/getUserName.inc.php');
+        const name = user_data.name;
+        document.getElementById('user-name').textContent = name;
+        console.log(name);
+    
         sendPostRequest("./includes/getTasks.inc.php", {filter: filter_value}).then(tasks => {
             tasksContainer.innerHTML = '';
             
@@ -339,9 +395,11 @@ class Router{
 
     setupTaskEventHandlers() {
         document.getElementById('task-filter').addEventListener('change', async (e) =>{
-            console.log('nvaoi')
-            this.setupTasksForm();
+            this.showTasks();
         });
+        const form = document.getElementById('add-task-form');
+        form.removeEventListener('submit', form.submitHandler);
+
         document.getElementById('add-task-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -351,8 +409,8 @@ class Router{
             
             console.log('Form data:', formDataObj);
             
-            if (!formDataObj.task_title?.trim()) {
-                alert('Task title is required!');
+            if (!formDataObj.task_title?.trim() || !formDataObj.task_title?.trimStart()) {
+                alert('Пустое название или название из одних проблеов');
                 return;
             }
 
@@ -364,7 +422,11 @@ class Router{
                     throw new Error(response.message || 'Add task failed');
                 }
                 
-                this.setupTasksForm(); 
+                this.showTasks(); 
+                const url = new URL(window.location.href);
+                url.searchParams.delete('token');
+                url.hash = "#login";
+                window.location.href = url.toString();
                 form.reset(); 
             } catch (error) {
                 console.error('Error adding task:', error);
@@ -380,7 +442,7 @@ class Router{
                 try {
                     const response = await sendPostRequest('./includes/toggleTask.inc.php', formDataObj);
                     if (!response.success) throw new Error('Toggle failed');
-                    this.setupTasksForm(); 
+                    this.showTasks(); 
                 } catch (error) {
                     console.error('Error toggling task:', error);
                 }
@@ -397,7 +459,7 @@ class Router{
                 try {
                     const response = await sendPostRequest('./includes/deleteTask.inc.php', formDataObj)
                     if (!response.success) throw new Error('Delete failed');
-                    this.setupTasksForm();
+                    this.showTasks();
                 } catch (error) {
                     console.error('Error deleting task:', error);
                 }
@@ -428,6 +490,12 @@ class Router{
                 const formDataObj = Object.fromEntries(formData.entries());
                 formDataObj.task_id = taskId;
                 
+                const title = formDataObj.task_title
+                console.log(title);
+                if(!title.trimStart() || !title.trim()){
+                    alert('Пустое название');
+                    return;
+                }
                 try {
                     const saveResponse = await sendPostRequest('./includes/updateTask.inc.php', formDataObj);
                     
@@ -469,8 +537,16 @@ class Router{
 }
 
 async function checkAuth() {
-    const responce = await sendPostRequest('./includes/isAuth.inc.php', {});
-    return responce.is_auth;
+    try {
+        const response = await fetch('./includes/isAuth.inc.php');
+        const data = await response.json();
+        console.log(data.is_auth);
+        return data.is_auth;
+    } catch (error) {
+        console.error('Auth check failed:', error);
+        return null;
+    }
 }
+
 
 new Router();
